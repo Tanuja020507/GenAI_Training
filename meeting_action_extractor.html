@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Meeting Action Extractor</title>
+<style>
+:root{--bg:#f5f7fb;--panel:#fff;--ink:#172033;--muted:#687386;--line:#e5e9f1;--accent:#5b5ce2;--accent2:#7778f0;--green:#16845b;--red:#c2414b}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--ink)}
+.topbar{background:#fff;border-bottom:1px solid var(--line);padding:18px 5vw;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.brand{display:flex;align-items:center;gap:11px;font-weight:750;font-size:18px}.logo{width:36px;height:36px;border-radius:11px;background:linear-gradient(135deg,var(--accent),#9697ff);display:grid;place-items:center;color:#fff;font-size:19px}
+.pill{font-size:12px;color:#5658c9;background:#efefff;border-radius:30px;padding:7px 11px;font-weight:650}
+main{max-width:1120px;margin:38px auto;padding:0 22px}.intro{margin-bottom:25px}.eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:1.3px;color:var(--accent);font-weight:750}.intro h1{font-size:clamp(27px,4vw,38px);margin:8px 0}.intro p{color:var(--muted);margin:0;line-height:1.6}
+.layout{display:grid;grid-template-columns:1.05fr .95fr;gap:20px;align-items:start}.card{background:var(--panel);border:1px solid var(--line);border-radius:17px;padding:23px;box-shadow:0 8px 28px rgba(30,42,75,.045)}
+.card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:15px;gap:12px}.card h2{font-size:17px;margin:0}.sub{font-size:13px;color:var(--muted);margin-top:5px}
+textarea{width:100%;min-height:300px;resize:vertical;border:1px solid #dce1eb;border-radius:12px;padding:15px;font:14px/1.7 ui-monospace,SFMono-Regular,Consolas,monospace;color:#273247;outline:none;background:#fcfdff}
+textarea:focus{border-color:var(--accent2);box-shadow:0 0 0 3px #7778f022}
+.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:15px}.btn{border:0;border-radius:10px;padding:11px 15px;font-weight:700;cursor:pointer;font-size:13px;transition:.15s}.btn:disabled{opacity:.55;cursor:wait}.primary{background:var(--accent);color:white}.primary:hover{background:#494acb}.secondary{background:#f0f1f7;color:#39445b}.textbtn{background:transparent;color:var(--accent);padding:8px}
+.mode-row{display:flex;gap:8px;background:#f2f3f8;border-radius:11px;padding:5px}.mode{flex:1;border:0;border-radius:8px;padding:9px 10px;background:transparent;color:#687386;font-weight:700;cursor:pointer}.mode.active{background:#fff;color:var(--accent);box-shadow:0 2px 7px #1a254012}
+.note{font-size:12px;color:var(--muted);line-height:1.5;margin:12px 0 0}.result-top{display:flex;align-items:center;gap:10px}.count{background:#f0f1ff;color:var(--accent);font-size:12px;font-weight:750;border-radius:20px;padding:6px 9px}
+.empty{min-height:250px;display:grid;place-items:center;text-align:center;color:var(--muted);padding:25px}.empty-icon{width:52px;height:52px;border-radius:16px;background:#f0f1ff;color:var(--accent);display:grid;place-items:center;font-size:24px;margin:0 auto 12px}.empty strong{display:block;color:#3a4559;margin-bottom:5px}
+.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;color:#778196;font-size:11px;text-transform:uppercase;letter-spacing:.6px;padding:11px 9px;border-bottom:1px solid var(--line)}td{padding:13px 9px;border-bottom:1px solid #edf0f5;vertical-align:top;line-height:1.5}td:first-child{font-weight:700;color:#3a4560}.deadline{display:inline-block;background:#f5f6fa;border-radius:7px;padding:4px 7px;color:#59657a;font-size:12px}
+.status{font-size:12px;margin-top:13px;min-height:18px;color:var(--muted)}.status.error{color:var(--red)}.status.success{color:var(--green)}
+.result-actions{display:flex;gap:8px;flex-wrap:wrap}.hidden{display:none!important}
+footer{text-align:center;color:#98a1b1;font-size:12px;padding:28px}
+@media(max-width:800px){.layout{grid-template-columns:1fr}.topbar{padding:15px 22px}main{margin:25px auto}.card{padding:18px}textarea{min-height:240px}}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><div class="logo">✓</div> ActionNote</div>
+  <span class="pill">MEETING NOTES → ACTION ITEMS</span>
+</header>
+<main>
+  <section class="intro">
+    <div class="eyebrow">AI meeting assistant</div>
+    <h1>Turn meeting notes into clear action items.</h1>
+    <p>Paste your meeting notes, choose an extraction mode, and organize tasks by owner and deadline.</p>
+  </section>
+  <div class="layout">
+    <section class="card">
+      <div class="card-head"><div><h2>Meeting notes</h2><div class="sub">Paste or edit your discussion notes below.</div></div><button class="btn textbtn" id="sampleBtn">Load sample</button></div>
+      <textarea id="notes" aria-label="Meeting notes" placeholder="Paste your meeting notes here..."></textarea>
+      <div style="margin:18px 0 9px;font-size:13px;font-weight:700">Extraction mode</div>
+      <div class="mode-row">
+        <button class="mode active" id="offlineMode" type="button">Offline</button>
+        <button class="mode" id="liveMode" type="button">Gemini AI</button>
+      </div>
+      <p class="note" id="modeHint">Offline mode detects lines formatted like: “Alex: Prepare wireframes by Wednesday.”</p>
+      <div class="actions">
+        <button class="btn primary" id="extractBtn">Extract action items&nbsp; →</button>
+        <button class="btn secondary" id="clearBtn">Clear</button>
+      </div>
+      <div class="status" id="status" role="status"></div>
+    </section>
+    <section class="card">
+      <div class="card-head">
+        <div><h2>Extracted actions</h2><div class="sub">Tasks, owners, and due dates in one place.</div></div>
+        <span class="count" id="count">0 items</span>
+      </div>
+      <div id="empty" class="empty"><div><div class="empty-icon">☷</div><strong>No action items yet</strong><span>Extract your notes to see tasks here.</span></div></div>
+      <div id="results" class="hidden">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Owner</th><th>Action item</th><th>Deadline</th></tr></thead>
+            <tbody id="actionRows"></tbody>
+          </table>
+        </div>
+        <div class="actions result-actions">
+          <button class="btn secondary" id="copyBtn">Copy JSON</button>
+          <button class="btn secondary" id="downloadBtn">Download JSON</button>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+<footer>ActionNote · Keep every meeting moving forward</footer>
+<script>
+const sampleNotes = `Website revamp kickoff
+Alex: What are the main features you want on the new landing page?
+Client: We need a modern hero section, customer testimonials, and an integrated booking calendar.
+Alex: Would you prefer Calendly integration or a custom-built solution?
+Client: Calendly works fine and keeps it simple.
+Alex: Perfect, I'll prepare the initial wireframes by Wednesday.`;
+
+const notesEl = document.getElementById('notes');
+const statusEl = document.getElementById('status');
+const rowsEl = document.getElementById('actionRows');
+let mode = 'offline';
+let extractedActions = [];
+
+document.getElementById('sampleBtn').addEventListener('click', () => { notesEl.value = sampleNotes; setStatus('Sample notes loaded.'); });
+document.getElementById('clearBtn').addEventListener('click', () => { notesEl.value=''; renderActions([]); setStatus(''); });
+document.getElementById('offlineMode').addEventListener('click', () => setMode('offline'));
+document.getElementById('liveMode').addEventListener('click', () => setMode('live'));
+document.getElementById('extractBtn').addEventListener('click', extract);
+document.getElementById('copyBtn').addEventListener('click', async () => {
+  await navigator.clipboard.writeText(JSON.stringify({actions:extractedActions}, null, 2));
+  setStatus('JSON copied to clipboard.','success');
+});
+document.getElementById('downloadBtn').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify({actions:extractedActions},null,2)],{type:'application/json'});
+  const url = URL.createObjectURL(blob); const a = document.createElement('a');
+  a.href=url; a.download='action-items.json'; a.click(); URL.revokeObjectURL(url);
+});
+
+function setMode(next) {
+  mode=next;
+  document.getElementById('offlineMode').classList.toggle('active',mode==='offline');
+  document.getElementById('liveMode').classList.toggle('active',mode==='live');
+  document.getElementById('modeHint').textContent = mode==='offline'
+    ? 'Offline mode detects lines formatted like: “Alex: Prepare wireframes by Wednesday.”'
+    : 'Gemini AI mode sends notes to your Python backend at POST /api/extract. Keep your API key on the server.';
+  setStatus('');
+}
+function setStatus(message,type=''){statusEl.textContent=message;statusEl.className='status '+type;}
+
+function offlineExtract(notes) {
+  const actions=[];
+  const pattern=/^([^:\\n]+):\\s*(.+?)\\s+by\\s+([^\\n.]+)[.]?$/i;
+  for (const line of notes.split(/\\r?\\n/)) {
+    const match=line.trim().match(pattern);
+    if(match) actions.push({owner:match[1].trim(),task:match[2].trim(),deadline:match[3].trim()});
+  }
+  return actions;
+}
+async function extract() {
+  const notes=notesEl.value.trim();
+  if(!notes){setStatus('Please paste your meeting notes first.','error');return;}
+  const button=document.getElementById('extractBtn');
+  button.disabled=true;button.textContent='Extracting…';setStatus('');
+  try {
+    let actions;
+    if(mode==='offline') actions=offlineExtract(notes);
+    else {
+      const response=await fetch('/api/extract',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({notes,mode:'live'})});
+      if(!response.ok) throw new Error(`Backend returned ${response.status}.`);
+      const data=await response.json(); actions=data.actions;
+      if(!Array.isArray(actions)) throw new Error('The server response did not contain an actions array.');
+    }
+    renderActions(actions);
+    setStatus(actions.length ? `Successfully extracted ${actions.length} action item(s).` : 'No matching action items found. Try Gemini AI mode for free-form notes.',actions.length?'success':'');
+  } catch(error) {
+    setStatus(error.message || 'Something went wrong while extracting actions.','error');
+  } finally {button.disabled=false;button.textContent='Extract action items  →';}
+}
+function renderActions(actions) {
+  extractedActions=actions; rowsEl.innerHTML='';
+  document.getElementById('count').textContent=`${actions.length} ${actions.length===1?'item':'items'}`;
+  document.getElementById('empty').classList.toggle('hidden',actions.length>0);
+  document.getElementById('results').classList.toggle('hidden',actions.length===0);
+  for(const item of actions) {
+    const tr=document.createElement('tr');
+    for(const value of [item.owner,item.task,item.deadline]) {
+      const td=document.createElement('td');
+      if(value===item.deadline) {const span=document.createElement('span');span.className='deadline';span.textContent=value;td.appendChild(span);}
+      else td.textContent=value;
+      tr.appendChild(td);
+    }
+    rowsEl.appendChild(tr);
+  }
+}
+notesEl.value=sampleNotes;
+</script>
+</body>
+</html>
